@@ -24,7 +24,7 @@ OptoFETEditor::OptoFETEditor(OptoFETProcessor& p):AudioProcessorEditor(p),proces
 }
 void OptoFETEditor::paint(juce::Graphics& g){
  g.fillAll(bg);g.setColour(juce::Colour(0xff242d35));g.fillRoundedRectangle(12,12,1096,596,13);
- g.setColour(gold);g.setFont(juce::Font(juce::FontOptions(32,juce::Font::bold)));g.drawText("OPTO / FET   0.2",36,22,620,44,juce::Justification::centredLeft);
+ g.setColour(gold);g.setFont(juce::Font(juce::FontOptions(32,juce::Font::bold)));g.drawText("OPTO / FET   0.3",36,22,620,44,juce::Justification::centredLeft);
  g.setColour(cream);g.setFont(juce::Font(juce::FontOptions(13)));g.drawText("T4-INSPIRED OPTICAL LEVELING  +  REV D-INSPIRED FET LIMITING",38,68,900,25,juce::Justification::centredLeft);
  g.setColour(gold);g.drawRoundedRectangle(26,116,520,405,9,1.5f);g.setColour(blue);g.drawRoundedRectangle(558,116,534,405,9,1.5f);
  g.setFont(juce::Font(juce::FontOptions(19,juce::Font::bold)));g.setColour(gold);g.drawText("OPTICAL / LA-2A",42,126,430,32,juce::Justification::centredLeft);

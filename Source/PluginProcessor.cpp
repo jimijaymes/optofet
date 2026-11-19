@@ -108,14 +108,17 @@ void OptoFETProcessor::processFET(juce::AudioBuffer<float>& b,int n,float drive,
   auto& s=fet[(size_t)c];float x=b.getSample(c,i),hot=x*pre;
   s.transformerLow=transformerPole*s.transformerLow+(1-transformerPole)*hot;
   float magnetic=hot+.10f*(soft(1.6f*s.transformerLow)/1.6f-s.transformerLow);
-  float a=std::abs(magnetic),ec=a>s.envelope?ac:rc;
-  s.envelope=ec*s.envelope+(1-ec)*a;
-  float levelDb=juce::Decibels::gainToDecibels(juce::jmax(s.envelope,1e-8f),-160.0f);
-  // Fixed 1176-style threshold: increasing input directly increases GR.
-  float target=softKnee(levelDb-(-18.0f),ratio,5.0f);
-  float gc=target>s.gr?ac:rc;
-  s.gr=gc*s.gr+(1-gc)*target;
-  float attenuated=magnetic*db(-s.gr);
+  // A single rectified peak detector controls the gain cell. The previous
+  // version applied the full attack/release envelope twice, slowing transients.
+  // The control maps 800->20 us attack and 1100->50 ms release (CW faster).
+  const float a=std::abs(magnetic);
+  const float ec=a>s.envelope?ac:rc;
+  s.envelope=ec*s.envelope+(1.0f-ec)*a;
+  const float levelDb=juce::Decibels::gainToDecibels(juce::jmax(s.envelope,1e-8f),-160.0f);
+  // Fixed threshold: input Drive increases the detector level and gain reduction.
+  const float target=softKnee(levelDb+18.0f,ratio,5.0f);
+  s.gr=target;
+  const float attenuated=magnetic*db(-s.gr);
   // Subtle Rev D-inspired amplifier saturation, stronger with drive.
   const float ampDrive=1.0f+0.65f*drive;
   float nonlinear=soft(attenuated*ampDrive)/ampDrive;
