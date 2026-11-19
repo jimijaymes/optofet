@@ -24,14 +24,14 @@ OptoFETEditor::OptoFETEditor(OptoFETProcessor& p):AudioProcessorEditor(p),proces
 }
 void OptoFETEditor::paint(juce::Graphics& g){
  g.fillAll(bg);g.setColour(juce::Colour(0xff242d35));g.fillRoundedRectangle(12,12,1096,596,13);
- g.setColour(gold);g.setFont(juce::Font(juce::FontOptions(32,juce::Font::bold)));g.drawText("OPTO / FET   0.1",36,22,620,44,juce::Justification::centredLeft);
+ g.setColour(gold);g.setFont(juce::Font(juce::FontOptions(32,juce::Font::bold)));g.drawText("OPTO / FET   0.2",36,22,620,44,juce::Justification::centredLeft);
  g.setColour(cream);g.setFont(juce::Font(juce::FontOptions(13)));g.drawText("T4-INSPIRED OPTICAL LEVELING  +  REV D-INSPIRED FET LIMITING",38,68,900,25,juce::Justification::centredLeft);
  g.setColour(gold);g.drawRoundedRectangle(26,116,520,405,9,1.5f);g.setColour(blue);g.drawRoundedRectangle(558,116,534,405,9,1.5f);
  g.setFont(juce::Font(juce::FontOptions(19,juce::Font::bold)));g.setColour(gold);g.drawText("OPTICAL / LA-2A",42,126,430,32,juce::Justification::centredLeft);
  g.setColour(blue);g.drawText("FET / 1176 REV D",575,126,420,32,juce::Justification::centredLeft);
  g.setColour(cream);g.setFont(juce::Font(juce::FontOptions(12)));
  g.drawText("Fixed tube + transformer colour: 15%  |  Soft knee: 10 dB",42,490,485,20,juce::Justification::centredLeft);
- g.drawText("Drive links input gain with output compensation",574,490,500,20,juce::Justification::centredLeft);
+ g.drawText("Drive raises detector input; linked output trims gain",574,490,500,20,juce::Justification::centredLeft);
  g.drawText("Optical GR: "+juce::String(optical,1)+" dB",41,537,255,25,juce::Justification::centredLeft);
  g.drawText("FET GR: "+juce::String(fet,1)+" dB",303,537,240,25,juce::Justification::centredLeft);
  g.drawText("ORDER: "+juce::String(reverse.getToggleState()?"1176 -> LA-2A":"LA-2A -> 1176"),568,537,480,25,juce::Justification::centredLeft);

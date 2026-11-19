@@ -92,11 +92,16 @@ void OptoFETProcessor::processOptical(juce::AudioBuffer<float>& b,int n,const st
  opticalGR.store(avgGR/juce::jmax(1,n*b.getNumChannels()),std::memory_order_relaxed);
 }
 void OptoFETProcessor::processFET(juce::AudioBuffer<float>& b,int n,float drive,float ratio,float attack,float release){
- float inputDb=drive*.24f,pre=db(inputDb),post=db(-inputDb);
+ // One-knob 1176-style input: drive is ahead of the detector and FET gain
+ // cell. Linked output trim cancels the added input gain, NOT the gain
+ // reduction itself; a compressor should still audibly compress harder.
+ const float inputDb=drive*36.0f;
+ const float pre=db(inputDb),post=db(-inputDb);
  float attackSec=.0008f*std::pow(.025f,attack);
  float releaseSec=.05f*std::pow(22.0f,1.0f-release);
  float ac=timeCoeff(attackSec,sr),rc=timeCoeff(releaseSec,sr);
- float levelCoef=timeCoeff(.35f,sr),servoCoef=timeCoeff(.65f,sr);
+ // No signal-following RMS servo: it previously restored the gain
+ // reduction and made increasing input seem ineffective.
  float transformerPole=pole(110,sr),ampPole=pole(8500,sr);
  float sum=0;
  for(int i=0;i<n;++i)for(int c=0;c<b.getNumChannels();++c){
@@ -106,20 +111,19 @@ void OptoFETProcessor::processFET(juce::AudioBuffer<float>& b,int n,float drive,
   float a=std::abs(magnetic),ec=a>s.envelope?ac:rc;
   s.envelope=ec*s.envelope+(1-ec)*a;
   float levelDb=juce::Decibels::gainToDecibels(juce::jmax(s.envelope,1e-8f),-160.0f);
+  // Fixed 1176-style threshold: increasing input directly increases GR.
   float target=softKnee(levelDb-(-18.0f),ratio,5.0f);
   float gc=target>s.gr?ac:rc;
   s.gr=gc*s.gr+(1-gc)*target;
   float attenuated=magnetic*db(-s.gr);
-  float nonlinear=soft(attenuated*(1.0f+.12f*drive))/(1.0f+.12f*drive);
+  // Subtle Rev D-inspired amplifier saturation, stronger with drive.
+  const float ampDrive=1.0f+0.65f*drive;
+  float nonlinear=soft(attenuated*ampDrive)/ampDrive;
   s.ampMemory=ampPole*s.ampMemory+(1-ampPole)*nonlinear;
   float coloured=nonlinear-.05f*drive*(nonlinear-s.ampMemory);
-  s.levelInput=levelCoef*s.levelInput+(1-levelCoef)*x*x;
-  float base=coloured*post;
-  s.levelOutput=levelCoef*s.levelOutput+(1-levelCoef)*base*base;
-  float wanted=std::sqrt((s.levelInput+1e-8f)/(s.levelOutput+1e-8f));
-  wanted=juce::jlimit(.35f,3.0f,wanted);
-  s.compensation=servoCoef*s.compensation+(1-servoCoef)*wanted;
-  b.setSample(c,i,base*s.compensation);sum+=s.gr;
+  // Static linked output trim maintains the nominal uncompressed level;
+  // actual loudness drops as gain reduction increases, as on hardware.
+  b.setSample(c,i,coloured*post);sum+=s.gr;
  }
  fetGR.store(sum/juce::jmax(1,n*b.getNumChannels()),std::memory_order_relaxed);
 }
