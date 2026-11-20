@@ -32,6 +32,8 @@ private:
  std::array<FETState,2> fet;
  std::array<float,2> detectorHPx{},detectorHPy{};
  juce::AudioBuffer<float> stageBuffer;
+ std::array<std::vector<float>,2> dryDelay;
+ int dryWrite=0;
  std::array<std::unique_ptr<juce::dsp::Oversampling<float>>,3> oversamplers;
  std::array<float,2> interstageLP1{},interstageLP2{};
  int activeOversampling=-1;
