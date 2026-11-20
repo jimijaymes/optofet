@@ -10,7 +10,7 @@ private:
  struct Choice{juce::ComboBox combo;juce::Label label;std::unique_ptr<juce::AudioProcessorValueTreeState::ComboBoxAttachment> attachment;};
  OptoFETProcessor& processor;
  std::array<Dial,8> dials;
- std::array<Choice,4> choices;
+ std::array<Choice,5> choices;
  juce::ToggleButton vintage,reverse;
  std::unique_ptr<juce::AudioProcessorValueTreeState::ButtonAttachment> vintageAttachment,reverseAttachment;
  float optical=0,fet=0;
