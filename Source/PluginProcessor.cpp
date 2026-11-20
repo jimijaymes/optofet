@@ -82,8 +82,16 @@ void OptoFETProcessor::processOptical(juce::AudioBuffer<float>& b,int n,const st
    float classicGR=(.9f-.42f*s.exposure)*s.t4Fast+(.1f+.42f*s.exposure)*s.t4Slow;
    float gr=classic?classicGR:s.enhanced;avgGR+=gr;
    float wet=magnetic*db(-gr);
-   float drive=1.0f+1.5f*.15f,bias=.08f*.15f;
-   wet=(soft(wet*drive+bias)-soft(bias))/(drive*(1-soft(bias)*soft(bias)));
+   // LA-2A-style valve line amplifier: cathode recovery and asymmetric
+   // grid bias, separate from the input transformer's LF nonlinearity.
+   const float cathodePole=pole(40,sr),biasPole=pole(12,sr);
+   s.tubeCathode=cathodePole*s.tubeCathode+(1-cathodePole)*std::abs(wet);
+   s.tubeBias=biasPole*s.tubeBias+(1-biasPole)*juce::jmax(0.f,wet-.35f);
+   const float drive=1.23f,bias=.012f+.025f*s.tubeCathode-.018f*s.tubeBias;
+   const float z=wet*drive+bias;
+   const float nonlinear=soft(z)-.008f*soft(z*z);
+   const float baseline=soft(bias)-.008f*soft(bias*bias);
+   wet=(nonlinear-baseline)/(drive*juce::jmax(.2f,1-soft(bias)*soft(bias)));
    s.highCut=vintagePole*s.highCut+(1-vintagePole)*wet;
    wet+=vintageBlend*(s.highCut-wet);
    b.setSample(c,i,wet*db(gain));
@@ -121,7 +129,14 @@ void OptoFETProcessor::processFET(juce::AudioBuffer<float>& b,int n,float drive,
   const float attenuated=magnetic*db(-s.gr);
   // Subtle Rev D-inspired amplifier saturation, stronger with drive.
   const float ampDrive=1.0f+0.65f*drive;
-  float nonlinear=soft(attenuated*ampDrive)/ampDrive;
+  // Rev-D-inspired Class A output amplifier: asymmetric headroom,
+  // LF-dependent bias recovery and transformer-related HF damping.
+  const float biasPole=pole(24,sr);
+  s.ampBias=biasPole*s.ampBias+(1-biasPole)*std::abs(attenuated);
+  const float bias=.055f*drive*s.ampBias;
+  const float z=attenuated*ampDrive+bias;
+  const float nonlinear=(soft(z)-soft(bias))/
+      (ampDrive*juce::jmax(.2f,1-soft(bias)*soft(bias)));
   s.ampMemory=ampPole*s.ampMemory+(1-ampPole)*nonlinear;
   float coloured=nonlinear-.05f*drive*(nonlinear-s.ampMemory);
   // Static linked output trim maintains the nominal uncompressed level;
