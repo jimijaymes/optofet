@@ -92,6 +92,14 @@ void OptoFETProcessor::processOptical(juce::AudioBuffer<float>& b,int n,const st
    const float nonlinear=soft(z)-.008f*soft(z*z);
    const float baseline=soft(bias)-.008f*soft(bias*bias);
    wet=(nonlinear-baseline)/(drive*juce::jmax(.2f,1-soft(bias)*soft(bias)));
+   // LA-2A-style output iron after the valve amplifier.
+   const float outBassPole=pole(125,sr),outFluxPole=pole(28,sr),outTreblePole=pole(10500,sr);
+   s.outputBass=outBassPole*s.outputBass+(1-outBassPole)*wet;
+   s.outputFlux=outFluxPole*s.outputFlux+(1-outFluxPole)*s.outputBass;
+   const float outDrive=1.45f*(1+.3f*juce::jmin(2.f,std::abs(s.outputFlux)));
+   wet+=.16f*(soft(outDrive*s.outputBass)/outDrive-s.outputBass);
+   s.outputTreble=outTreblePole*s.outputTreble+(1-outTreblePole)*wet;
+   wet-=.018f*juce::jmin(1.f,std::abs(s.outputFlux))*(wet-s.outputTreble);
    s.highCut=vintagePole*s.highCut+(1-vintagePole)*wet;
    wet+=vintageBlend*(s.highCut-wet);
    b.setSample(c,i,wet*db(gain));
@@ -115,7 +123,14 @@ void OptoFETProcessor::processFET(juce::AudioBuffer<float>& b,int n,float drive,
  for(int i=0;i<n;++i)for(int c=0;c<b.getNumChannels();++c){
   auto& s=fet[(size_t)c];float x=b.getSample(c,i),hot=x*pre;
   s.transformerLow=transformerPole*s.transformerLow+(1-transformerPole)*hot;
-  float magnetic=hot+.10f*(soft(1.6f*s.transformerLow)/1.6f-s.transformerLow);
+  // Early 1176 UTC O-12 input transformer approximation: flux-dependent
+  // LF limiting and a separate loading-dependent HF response.
+  const float fluxPole=pole(35,sr),hfPole=pole(12000,sr);
+  s.transformerFlux=fluxPole*s.transformerFlux+(1-fluxPole)*s.transformerLow;
+  const float coreDrive=1.6f*(1+.25f*juce::jmin(2.f,std::abs(s.transformerFlux)));
+  float magnetic=hot+.10f*(soft(coreDrive*s.transformerLow)/coreDrive-s.transformerLow);
+  s.transformerTreble=hfPole*s.transformerTreble+(1-hfPole)*magnetic;
+  magnetic-=.015f*juce::jmin(1.f,std::abs(s.transformerFlux))*(magnetic-s.transformerTreble);
   // A single rectified peak detector controls the gain cell. The previous
   // version applied the full attack/release envelope twice, slowing transients.
   // The control maps 800->20 us attack and 1100->50 ms release (CW faster).
@@ -139,6 +154,16 @@ void OptoFETProcessor::processFET(juce::AudioBuffer<float>& b,int n,float drive,
       (ampDrive*juce::jmax(.2f,1-soft(bias)*soft(bias)));
   s.ampMemory=ampPole*s.ampMemory+(1-ampPole)*nonlinear;
   float coloured=nonlinear-.05f*drive*(nonlinear-s.ampMemory);
+  // Early 1176 Class A output transformer, after the amplifier;
+  // deliberately distinct from the UTC input transformer's behaviour.
+  const float outBassPole=pole(155,sr),outFluxPole=pole(43,sr);
+  const float outTreblePole=pole(12500,sr);
+  s.outputBass=outBassPole*s.outputBass+(1-outBassPole)*coloured;
+  s.outputFlux=outFluxPole*s.outputFlux+(1-outFluxPole)*s.outputBass;
+  const float outDrive=1.55f*(1+.35f*juce::jmin(2.f,std::abs(s.outputFlux)));
+  coloured+=.12f*(soft(outDrive*s.outputBass)/outDrive-s.outputBass);
+  s.outputTreble=outTreblePole*s.outputTreble+(1-outTreblePole)*coloured;
+  coloured-=.02f*juce::jmin(1.f,std::abs(s.outputFlux))*(coloured-s.outputTreble);
   // Static linked output trim maintains the nominal uncompressed level;
   // actual loudness drops as gain reduction increases, as on hardware.
   b.setSample(c,i,coloured*post);sum+=s.gr;
