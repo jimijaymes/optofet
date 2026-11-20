@@ -1,9 +1,9 @@
 #include "PluginEditor.h"
 namespace{const juce::Colour bg(0xff171c22),cream(0xfff0e7d7),gold(0xffcba86a),blue(0xff70b5c9);}
 OptoFETEditor::OptoFETEditor(OptoFETProcessor& p):AudioProcessorEditor(p),processor(p){
- const char* ids[]={"input","output","peak","optoGain","drive","attack","fetRelease",""};
- const char* names[]={"GLOBAL INPUT","GLOBAL OUTPUT","OPTICAL REDUCTION","OPTICAL GAIN","1176 DRIVE / LEVEL","1176 ATTACK","1176 RELEASE",""};
- for(size_t i=0;i<7;++i){auto& k=dials[i];k.slider.setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);k.slider.setTextBoxStyle(juce::Slider::TextBoxBelow,false,85,21);
+ const char* ids[]={"input","output","peak","optoGain","drive","attack","fetRelease","mix"};
+ const char* names[]={"GLOBAL INPUT","GLOBAL OUTPUT","OPTICAL REDUCTION","OPTICAL GAIN","1176 DRIVE / LEVEL","1176 ATTACK","1176 RELEASE","MIX"};
+ for(size_t i=0;i<8;++i){auto& k=dials[i];k.slider.setSliderStyle(juce::Slider::RotaryHorizontalVerticalDrag);k.slider.setTextBoxStyle(juce::Slider::TextBoxBelow,false,85,21);
   k.slider.setColour(juce::Slider::rotarySliderFillColourId,i<4?gold:blue);k.slider.setColour(juce::Slider::rotarySliderOutlineColourId,juce::Colour(0xff3b4651));
   k.slider.setColour(juce::Slider::thumbColourId,cream);k.slider.setColour(juce::Slider::textBoxTextColourId,cream);
   k.slider.setColour(juce::Slider::textBoxOutlineColourId,juce::Colours::transparentBlack);k.slider.setColour(juce::Slider::textBoxBackgroundColourId,juce::Colours::transparentBlack);
@@ -37,7 +37,7 @@ void OptoFETEditor::paint(juce::Graphics& g){
  g.drawText("ORDER: "+juce::String(reverse.getToggleState()?"1176 -> LA-2A":"LA-2A -> 1176"),568,537,480,25,juce::Justification::centredLeft);
 }
 void OptoFETEditor::resized(){
- const int positions[][2]={{38,174},{174,174},{38,294},{174,294},{580,174},{730,174},{880,174}};
+ const int positions[][2]={{38,174},{174,174},{38,294},{174,294},{580,174},{730,174},{880,174},{880,294}};
  for(int i=0;i<7;++i){auto& k=dials[(size_t)i];k.slider.setBounds(positions[i][0],positions[i][1],125,108);k.label.setBounds(positions[i][0]-10,positions[i][1]+106,145,25);}
  const int choicePos[][2]={{326,184},{326,252},{326,320},{622,368},{622,438}};
  for(int i=0;i<5;++i){auto& k=choices[(size_t)i];k.label.setBounds(choicePos[i][0],choicePos[i][1],175,22);k.combo.setBounds(choicePos[i][0]+5,choicePos[i][1]+24,165,28);}
