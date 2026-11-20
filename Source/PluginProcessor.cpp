@@ -29,13 +29,22 @@ juce::AudioProcessorValueTreeState::ParameterLayout OptoFETProcessor::layout(){
  p.add(std::make_unique<F>(juce::ParameterID{"attack",1},"1176 Attack",juce::NormalisableRange<float>(0,100,0.1f),50));
  p.add(std::make_unique<F>(juce::ParameterID{"fetRelease",1},"1176 Release",juce::NormalisableRange<float>(0,100,0.1f),55));
  p.add(std::make_unique<B>(juce::ParameterID{"reverse",1},"1176 First",false));
+ p.add(std::make_unique<C>(juce::ParameterID{"oversampling",1},"Oversampling",juce::StringArray{"Off (1x)","2x","4x","8x"},2));
  return p;
 }
 OptoFETProcessor::OptoFETProcessor():AudioProcessor(BusesProperties().withInput("Input",juce::AudioChannelSet::stereo(),true).withOutput("Output",juce::AudioChannelSet::stereo(),true)),parameters(*this,nullptr,"STATE",layout()){}
 void OptoFETProcessor::prepareToPlay(double sampleRate,int maximumExpectedSamplesPerBlock){
  sr=sampleRate;blockSize=juce::jmax(1,maximumExpectedSamplesPerBlock);
  opto={};fet={};detectorHPx={};detectorHPy={};orderBlend=vintageBlend=0;
- stageBuffer.setSize(2,blockSize);setLatencySamples(0);
+ stageBuffer.setSize(2,blockSize);
+ interstageLP1={};interstageLP2={};activeOversampling=-1;
+ for(int i=0;i<3;++i){
+  oversamplers[(size_t)i]=std::make_unique<juce::dsp::Oversampling<float>>(
+   2,(size_t)(i+1),juce::dsp::Oversampling<float>::filterHalfBandPolyphaseIIR,true,true);
+  oversamplers[(size_t)i]->initProcessing((size_t)blockSize);
+  oversamplers[(size_t)i]->reset();
+ }
+ setLatencySamples(0);
 }
 void OptoFETProcessor::processOptical(juce::AudioBuffer<float>& b,int n,const std::array<float,2>& unused,float peak,float gain,float ratio,bool classic,bool fast,bool vintage){
  juce::ignoreUnused(unused);
@@ -170,6 +179,23 @@ void OptoFETProcessor::processFET(juce::AudioBuffer<float>& b,int n,float drive,
  }
  fetGR.store(sum/juce::jmax(1,n*b.getNumChannels()),std::memory_order_relaxed);
 }
+void OptoFETProcessor::filterInterstage(juce::AudioBuffer<float>& b,int n){
+ // Two cascaded one-pole low-pass sections, nominal 20 kHz.
+ // Clamp below Nyquist in 1x mode. The filter reduces interstage HF,
+ // but is NOT a substitute for oversampling's anti-alias decimator.
+ const float cutoff=juce::jmin(20000.0f,0.45f*(float)sr);
+ const float a=pole(cutoff,sr);
+ for(int c=0;c<b.getNumChannels();++c){
+  auto& s1=interstageLP1[(size_t)c];
+  auto& s2=interstageLP2[(size_t)c];
+  float* x=b.getWritePointer(c);
+  for(int i=0;i<n;++i){
+   s1=a*s1+(1.0f-a)*x[i];
+   s2=a*s2+(1.0f-a)*s1;
+   x[i]=s2;
+  }
+ }
+}
 void OptoFETProcessor::processBlock(juce::AudioBuffer<float>& buffer,juce::MidiBuffer&){
  juce::ScopedNoDenormals noDenormals;
  const int channels=juce::jmin(2,buffer.getNumChannels()),n=buffer.getNumSamples();
@@ -183,13 +209,45 @@ void OptoFETProcessor::processBlock(juce::AudioBuffer<float>& buffer,juce::MidiB
  const float ratios[]={4,8,12,20};int ri=juce::jlimit(0,3,(int)*parameters.getRawParameterValue("fetRatio"));
  float attack=*parameters.getRawParameterValue("attack")*.01f,release=*parameters.getRawParameterValue("fetRelease")*.01f;
  bool reverse=*parameters.getRawParameterValue("reverse")>.5f;
+ const int osChoice=juce::jlimit(0,3,(int)*parameters.getRawParameterValue("oversampling"));
+ // Mode changes can change latency; the host is notified when necessary.
+ if(osChoice!=activeOversampling){
+  activeOversampling=osChoice;
+  setLatencySamples(osChoice==0?0:
+   (int)std::round(oversamplers[(size_t)(osChoice-1)]->getLatencyInSamples()));
+ }
+ const double hostRate=sr;
  for(int offset=0;offset<n;offset+=blockSize){
-  int count=juce::jmin(blockSize,n-offset);
-  for(int c=0;c<channels;++c){auto* dst=stageBuffer.getWritePointer(c);auto* src=buffer.getReadPointer(c,offset);for(int i=0;i<count;++i)dst[i]=src[i]*in;}
-  juce::AudioBuffer<float> chunk(stageBuffer.getArrayOfWritePointers(),channels,count);
-  if(reverse){processFET(chunk,count,drive,ratios[ri],attack,release);processOptical(chunk,count,{},peak,optoMakeup,opticalRatio,classic,fast,vintage);}
-  else{processOptical(chunk,count,{},peak,optoMakeup,opticalRatio,classic,fast,vintage);processFET(chunk,count,drive,ratios[ri],attack,release);}
-  for(int c=0;c<channels;++c){auto* dst=buffer.getWritePointer(c,offset);auto* src=chunk.getReadPointer(c);for(int i=0;i<count;++i)dst[i]=src[i]*out;}
+  const int count=juce::jmin(blockSize,n-offset);
+  for(int c=0;c<channels;++c){
+   auto* dst=stageBuffer.getWritePointer(c);
+   const auto* src=buffer.getReadPointer(c,offset);
+   for(int i=0;i<count;++i)dst[i]=src[i]*in;
+  }
+  juce::dsp::AudioBlock<float> base(stageBuffer);
+  auto slice=base.getSubBlock(0,(size_t)count);
+  const int factor=1<<osChoice;
+  juce::dsp::AudioBlock<float> up=slice;
+  if(osChoice>0)up=oversamplers[(size_t)(osChoice-1)]->processSamplesUp(slice);
+  const int upCount=(int)up.getNumSamples();
+  juce::AudioBuffer<float> chunk(up.getArrayOfChannelPointers(),channels,upCount);
+  sr=hostRate*(double)factor;
+  if(reverse){
+   processFET(chunk,upCount,drive,ratios[ri],attack,release);
+   filterInterstage(chunk,upCount);
+   processOptical(chunk,upCount,{},peak,optoMakeup,opticalRatio,classic,fast,vintage);
+  }else{
+   processOptical(chunk,upCount,{},peak,optoMakeup,opticalRatio,classic,fast,vintage);
+   filterInterstage(chunk,upCount);
+   processFET(chunk,upCount,drive,ratios[ri],attack,release);
+  }
+  sr=hostRate;
+  if(osChoice>0)oversamplers[(size_t)(osChoice-1)]->processSamplesDown(slice);
+  for(int c=0;c<channels;++c){
+   auto* dst=buffer.getWritePointer(c,offset);
+   const auto* src=stageBuffer.getReadPointer(c);
+   for(int i=0;i<count;++i)dst[i]=src[i]*out;
+  }
  }
 }
 juce::AudioProcessorEditor* OptoFETProcessor::createEditor(){return new OptoFETEditor(*this);}
