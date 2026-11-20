@@ -18,6 +18,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout OptoFETProcessor::layout(){
  juce::AudioProcessorValueTreeState::ParameterLayout p;
  p.add(std::make_unique<F>(juce::ParameterID{"input",1},"Global Input (dB)",juce::NormalisableRange<float>(-24,24,0.1f),0));
  p.add(std::make_unique<F>(juce::ParameterID{"output",1},"Global Output (dB)",juce::NormalisableRange<float>(-24,24,0.1f),0));
+ p.add(std::make_unique<F>(juce::ParameterID{"mix",1},"Wet Mix (%)",juce::NormalisableRange<float>(0,100,0.1f),100));
  p.add(std::make_unique<F>(juce::ParameterID{"peak",1},"Optical Peak Reduction",juce::NormalisableRange<float>(0,50,0.1f),18));
  p.add(std::make_unique<F>(juce::ParameterID{"optoGain",1},"Optical Makeup (dB)",juce::NormalisableRange<float>(-12,24,0.1f),0));
  p.add(std::make_unique<C>(juce::ParameterID{"optoRatio",1},"Optical Mode",juce::StringArray{"Compress","Limit"},0));
@@ -37,6 +38,8 @@ void OptoFETProcessor::prepareToPlay(double sampleRate,int maximumExpectedSample
  sr=sampleRate;blockSize=juce::jmax(1,maximumExpectedSamplesPerBlock);
  opto={};fet={};detectorHPx={};detectorHPy={};orderBlend=vintageBlend=0;
  stageBuffer.setSize(2,blockSize);
+ for(auto& ring:dryDelay)ring.assign(16384,0.f);
+ dryWrite=0;
  interstageLP1={};interstageLP2={};activeOversampling=-1;
  for(int i=0;i<3;++i){
   oversamplers[(size_t)i]=std::make_unique<juce::dsp::Oversampling<float>>(
@@ -202,6 +205,7 @@ void OptoFETProcessor::processBlock(juce::AudioBuffer<float>& buffer,juce::MidiB
  if(channels==0||n==0)return;
  for(int c=channels;c<buffer.getNumChannels();++c)buffer.clear(c,0,n);
  float in=db(*parameters.getRawParameterValue("input")),out=db(*parameters.getRawParameterValue("output"));
+ const float mix=juce::jlimit(0.f,1.f,*parameters.getRawParameterValue("mix")*.01f);
  float peak=*parameters.getRawParameterValue("peak"),optoMakeup=*parameters.getRawParameterValue("optoGain");
  bool classic=*parameters.getRawParameterValue("response")>.5f,fast=*parameters.getRawParameterValue("release")>.5f,vintage=*parameters.getRawParameterValue("vintage")>.5f;
  float opticalRatio=*parameters.getRawParameterValue("optoRatio")>.5f?20.0f:3.0f;
@@ -217,6 +221,8 @@ void OptoFETProcessor::processBlock(juce::AudioBuffer<float>& buffer,juce::MidiB
    (int)std::round(oversamplers[(size_t)(osChoice-1)]->getLatencyInSamples()));
  }
  const double hostRate=sr;
+ const int dryLatency=osChoice==0?0:(int)std::round(oversamplers[(size_t)(osChoice-1)]->getLatencyInSamples());
+ const int ringSize=(int)dryDelay[0].size();
  for(int offset=0;offset<n;offset+=blockSize){
   const int count=juce::jmin(blockSize,n-offset);
   for(int c=0;c<channels;++c){
@@ -246,8 +252,17 @@ void OptoFETProcessor::processBlock(juce::AudioBuffer<float>& buffer,juce::MidiB
   for(int c=0;c<channels;++c){
    auto* dst=buffer.getWritePointer(c,offset);
    const auto* src=stageBuffer.getReadPointer(c);
-   for(int i=0;i<count;++i)dst[i]=src[i]*out;
+   for(int i=0;i<count;++i){
+    const float dryInput=buffer.getReadPointer(c,offset)[i]*in;
+    auto& ring=dryDelay[(size_t)c];
+    const int write=(dryWrite+i)%ringSize;
+    const int read=(write+ringSize-juce::jmin(dryLatency,ringSize-1))%ringSize;
+    const float dry=dryLatency==0?dryInput:ring[(size_t)read];
+    ring[(size_t)write]=dryInput;
+    dst[i]=(src[i]*mix+dry*(1.f-mix))*out;
+   }
   }
+  dryWrite=(dryWrite+count)%ringSize;
  }
 }
 juce::AudioProcessorEditor* OptoFETProcessor::createEditor(){return new OptoFETEditor(*this);}
