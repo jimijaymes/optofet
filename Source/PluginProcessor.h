@@ -32,10 +32,14 @@ private:
  std::array<FETState,2> fet;
  std::array<float,2> detectorHPx{},detectorHPy{};
  juce::AudioBuffer<float> stageBuffer;
+ std::array<std::unique_ptr<juce::dsp::Oversampling<float>>,3> oversamplers;
+ std::array<float,2> interstageLP1{},interstageLP2{};
+ int activeOversampling=-1;
  double sr=44100;
  int blockSize=512;
  float orderBlend=0,vintageBlend=0;
  void processOptical(juce::AudioBuffer<float>&,int,const std::array<float,2>&,float,float,float,bool,bool,bool);
  void processFET(juce::AudioBuffer<float>&,int,float,float,float,float);
+ void filterInterstage(juce::AudioBuffer<float>&,int);
  JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(OptoFETProcessor)
 };
