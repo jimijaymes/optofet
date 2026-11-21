@@ -33,6 +33,8 @@ private:
  std::array<float,2> detectorHPx{},detectorHPy{};
  juce::AudioBuffer<float> stageBuffer;
  std::array<std::vector<float>,2> dryDelay;
+ std::array<std::vector<float>,2> wetDelay;
+ int fixedOversamplingLatency=0;
  int dryWrite=0;
  std::array<std::unique_ptr<juce::dsp::Oversampling<float>>,3> oversamplers;
  std::array<float,2> interstageLP1{},interstageLP2{};
