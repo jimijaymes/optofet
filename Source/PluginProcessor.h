@@ -27,7 +27,7 @@ public:
 private:
  static juce::AudioProcessorValueTreeState::ParameterLayout layout();
  struct OpticalState {float bass=0,presence=0,bassEnv=0,presenceEnv=0,enhanced=0,memory=0,exposure=0,t4Fast=0,t4Slow=0,highCut=0,transformerBass=0,transformerFlux=0,transformerTreble=0,tubeBias=0,tubeCathode=0,outputBass=0,outputFlux=0,outputTreble=0;};
- struct FETState {float envelope=0,gr=0,transformerLow=0,ampMemory=0,ampBias=0,transformerFlux=0,transformerTreble=0,outputBass=0,outputFlux=0,outputTreble=0,levelInput=0,levelOutput=0,compensation=1;};
+ struct FETState {float envelope=0,gr=0,makeupDb=0,transformerLow=0,ampMemory=0,ampBias=0,transformerFlux=0,transformerTreble=0,outputBass=0,outputFlux=0,outputTreble=0,levelInput=0,levelOutput=0,compensation=1;};
  std::array<OpticalState,2> opto;
  std::array<FETState,2> fet;
  std::array<float,2> detectorHPx{},detectorHPy{};
