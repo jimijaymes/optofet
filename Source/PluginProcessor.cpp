@@ -18,6 +18,9 @@ juce::AudioProcessorValueTreeState::ParameterLayout OptoFETProcessor::layout(){
  juce::AudioProcessorValueTreeState::ParameterLayout p;
  p.add(std::make_unique<F>(juce::ParameterID{"input",1},"Global Input (dB)",juce::NormalisableRange<float>(-24,24,0.1f),0));
  p.add(std::make_unique<F>(juce::ParameterID{"output",1},"Global Output (dB)",juce::NormalisableRange<float>(-24,24,0.1f),0));
+ p.add(std::make_unique<B>(juce::ParameterID{"optoEnabled",1},"Optical Enabled",true));
+ p.add(std::make_unique<B>(juce::ParameterID{"fetEnabled",1},"FET Enabled",true));
+ p.add(std::make_unique<F>(juce::ParameterID{"sidechainHPF",1},"Master Sidechain HPF (Hz)",juce::NormalisableRange<float>(20.f,400.f,0.f,0.35f),90.f));
  p.add(std::make_unique<F>(juce::ParameterID{"mix",1},"Wet Mix (%)",juce::NormalisableRange<float>(0,100,0.1f),100));
  p.add(std::make_unique<F>(juce::ParameterID{"peak",1},"Optical Peak Reduction",juce::NormalisableRange<float>(0,50,0.1f),18));
  p.add(std::make_unique<F>(juce::ParameterID{"optoGain",1},"Optical Makeup (dB)",juce::NormalisableRange<float>(-12,24,0.1f),0));
@@ -70,7 +73,7 @@ void OptoFETProcessor::processOptical(juce::AudioBuffer<float>& b,int n,const st
    float magnetic=x+.135f*(soft(d*s.transformerBass)/d-s.transformerBass);
    s.transformerTreble=treblePole*s.transformerTreble+(1-treblePole)*magnetic;
    magnetic-=.018f*juce::jlimit(0.0f,1.0f,std::abs(s.transformerFlux)*1.5f)*(magnetic-s.transformerTreble);
-   const float hpA=1.0f/(1.0f+2.0f*juce::MathConstants<float>::pi*90.0f/(float)sr);
+   const float hpA=1.0f/(1.0f+2.0f*juce::MathConstants<float>::pi*sidechainHz/(float)sr);
    float detected=hpA*(detectorHPy[(size_t)c]+magnetic-detectorHPx[(size_t)c]);
    detectorHPx[(size_t)c]=magnetic;detectorHPy[(size_t)c]=detected;
    s.bass=split*s.bass+(1-split)*detected;
@@ -157,7 +160,11 @@ void OptoFETProcessor::processFET(juce::AudioBuffer<float>& b,int n,float drive,
   // A single rectified peak detector controls the gain cell. The previous
   // version applied the full attack/release envelope twice, slowing transients.
   // The control maps 800->20 us attack and 1100->50 ms release (CW faster).
-  const float a=std::abs(magnetic);
+  // Independent detector-only high-pass: never filters the audible FET path.
+  const float hpA=1.f/(1.f+2.f*juce::MathConstants<float>::pi*sidechainHz/(float)sr);
+  const float sc=hpA*(s.scHPy+magnetic-s.scHPx);
+  s.scHPx=magnetic;s.scHPy=sc;
+  const float a=std::abs(sc);
   const float ec=a>s.envelope?ac:rc;
   s.envelope=ec*s.envelope+(1.0f-ec)*a;
   const float levelDb=juce::Decibels::gainToDecibels(juce::jmax(s.envelope,1e-8f),-160.0f);
@@ -220,6 +227,9 @@ void OptoFETProcessor::processBlock(juce::AudioBuffer<float>& buffer,juce::MidiB
  for(int c=channels;c<buffer.getNumChannels();++c)buffer.clear(c,0,n);
  float in=db(*parameters.getRawParameterValue("input")),out=db(*parameters.getRawParameterValue("output"));
  const float mix=juce::jlimit(0.f,1.f,*parameters.getRawParameterValue("mix")*.01f);
+ const bool optoOn=*parameters.getRawParameterValue("optoEnabled")>.5f;
+ const bool fetOn=*parameters.getRawParameterValue("fetEnabled")>.5f;
+ sidechainHz=*parameters.getRawParameterValue("sidechainHPF");
  float peak=*parameters.getRawParameterValue("peak"),optoMakeup=*parameters.getRawParameterValue("optoGain");
  bool classic=*parameters.getRawParameterValue("response")>.5f,fast=*parameters.getRawParameterValue("release")>.5f,vintage=*parameters.getRawParameterValue("vintage")>.5f;
  float opticalRatio=*parameters.getRawParameterValue("optoRatio")>.5f?20.0f:3.0f;
@@ -255,14 +265,16 @@ void OptoFETProcessor::processBlock(juce::AudioBuffer<float>& buffer,juce::MidiB
   juce::AudioBuffer<float> chunk(upChannels,channels,upCount);
   sr=hostRate*(double)factor;
   if(reverse){
-   processFET(chunk,upCount,drive,ratios[ri],attack,release);
-   filterInterstage(chunk,upCount);
-   processOptical(chunk,upCount,{},peak,optoMakeup,opticalRatio,classic,fast,vintage);
+   if(fetOn)processFET(chunk,upCount,drive,ratios[ri],attack,release);
+   if(optoOn&&fetOn)filterInterstage(chunk,upCount);
+   if(optoOn)processOptical(chunk,upCount,{},peak,optoMakeup,opticalRatio,classic,fast,vintage);
   }else{
-   processOptical(chunk,upCount,{},peak,optoMakeup,opticalRatio,classic,fast,vintage);
-   filterInterstage(chunk,upCount);
-   processFET(chunk,upCount,drive,ratios[ri],attack,release);
+   if(optoOn)processOptical(chunk,upCount,{},peak,optoMakeup,opticalRatio,classic,fast,vintage);
+   if(optoOn&&fetOn)filterInterstage(chunk,upCount);
+   if(fetOn)processFET(chunk,upCount,drive,ratios[ri],attack,release);
   }
+  if(!optoOn)opticalGR.store(0.f,std::memory_order_relaxed);
+  if(!fetOn)fetGR.store(0.f,std::memory_order_relaxed);
   sr=hostRate;
   if(osChoice>0)oversamplers[(size_t)(osChoice-1)]->processSamplesDown(slice);
   for(int c=0;c<channels;++c){
