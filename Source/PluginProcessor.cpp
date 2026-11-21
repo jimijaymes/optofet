@@ -29,6 +29,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout OptoFETProcessor::layout(){
  p.add(std::make_unique<C>(juce::ParameterID{"fetRatio",1},"1176 Ratio",juce::StringArray{"4:1","8:1","12:1","20:1"},0));
  p.add(std::make_unique<F>(juce::ParameterID{"attack",1},"1176 Attack",juce::NormalisableRange<float>(0,100,0.1f),50));
  p.add(std::make_unique<F>(juce::ParameterID{"fetRelease",1},"1176 Release",juce::NormalisableRange<float>(0,100,0.1f),55));
+ p.add(std::make_unique<C>(juce::ParameterID{"fetTiming",1},"FET Timing Mode",juce::StringArray{"1176 Classic","Extended"},0));
  p.add(std::make_unique<B>(juce::ParameterID{"reverse",1},"1176 First",false));
  p.add(std::make_unique<C>(juce::ParameterID{"oversampling",1},"Oversampling",juce::StringArray{"Off (1x)","2x","4x","8x"},2));
  return p;
@@ -125,8 +126,15 @@ void OptoFETProcessor::processFET(juce::AudioBuffer<float>& b,int n,float drive,
  // reduction itself; a compressor should still audibly compress harder.
  const float inputDb=drive*36.0f;
  const float pre=db(inputDb),post=db(-inputDb);
- float attackSec=.0008f*std::pow(.025f,attack);
- float releaseSec=.05f*std::pow(22.0f,1.0f-release);
+ const bool extended=*parameters.getRawParameterValue("fetTiming")>.5f;
+ // Classic: 20-800 us attack and 50-1100 ms release.
+ // Extended: 20 us-30 ms attack and 25-1650 ms release.
+ // Clockwise remains faster for both knobs in either mode.
+ const float slowAttack=extended?.030f:.0008f;
+ const float fastRelease=extended?.025f:.050f;
+ const float slowRelease=extended?1.650f:1.100f;
+ float attackSec=slowAttack*std::pow(.000020f/slowAttack,attack);
+ float releaseSec=fastRelease*std::pow(slowRelease/fastRelease,1.0f-release);
  float ac=timeCoeff(attackSec,sr),rc=timeCoeff(releaseSec,sr);
  // No signal-following RMS servo: it previously restored the gain
  // reduction and made increasing input seem ineffective.
