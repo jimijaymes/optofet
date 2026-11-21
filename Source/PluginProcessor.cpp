@@ -244,7 +244,9 @@ void OptoFETProcessor::processBlock(juce::AudioBuffer<float>& buffer,juce::MidiB
   juce::dsp::AudioBlock<float> up=slice;
   if(osChoice>0)up=oversamplers[(size_t)(osChoice-1)]->processSamplesUp(slice);
   const int upCount=(int)up.getNumSamples();
-  juce::AudioBuffer<float> chunk(up.getArrayOfChannelPointers(),channels,upCount);
+  // AudioBlock exposes per-channel pointers, not getArrayOfChannelPointers().
+  float* upChannels[2] = { up.getChannelPointer(0), channels > 1 ? up.getChannelPointer(1) : nullptr };
+  juce::AudioBuffer<float> chunk(upChannels,channels,upCount);
   sr=hostRate*(double)factor;
   if(reverse){
    processFET(chunk,upCount,drive,ratios[ri],attack,release);
