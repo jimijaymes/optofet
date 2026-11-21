@@ -136,6 +136,9 @@ void OptoFETProcessor::processFET(juce::AudioBuffer<float>& b,int n,float drive,
  float attackSec=slowAttack*std::pow(.000020f/slowAttack,attack);
  float releaseSec=fastRelease*std::pow(slowRelease/fastRelease,1.0f-release);
  float ac=timeCoeff(attackSec,sr),rc=timeCoeff(releaseSec,sr);
+ // Slow, bounded automatic output makeup tracks a portion of gain reduction.
+ // Preserve transient compression; avoid following the fast FET envelope.
+ const float makeupRise=timeCoeff(.250f,sr),makeupFall=timeCoeff(.650f,sr);
  // No signal-following RMS servo: it previously restored the gain
  // reduction and made increasing input seem ineffective.
  float transformerPole=pole(110,sr),ampPole=pole(8500,sr);
@@ -161,6 +164,9 @@ void OptoFETProcessor::processFET(juce::AudioBuffer<float>& b,int n,float drive,
   // Fixed threshold: input Drive increases the detector level and gain reduction.
   const float target=softKnee(levelDb+18.0f,ratio,5.0f);
   s.gr=target;
+  const float makeupTarget=juce::jlimit(0.f,12.f,target*.60f);
+  const float makeupCoeff=makeupTarget>s.makeupDb?makeupRise:makeupFall;
+  s.makeupDb=makeupCoeff*s.makeupDb+(1.f-makeupCoeff)*makeupTarget;
   const float attenuated=magnetic*db(-s.gr);
   // Subtle Rev D-inspired amplifier saturation, stronger with drive.
   const float ampDrive=1.0f+0.65f*drive;
@@ -186,7 +192,7 @@ void OptoFETProcessor::processFET(juce::AudioBuffer<float>& b,int n,float drive,
   coloured-=.02f*juce::jmin(1.f,std::abs(s.outputFlux))*(coloured-s.outputTreble);
   // Static linked output trim maintains the nominal uncompressed level;
   // actual loudness drops as gain reduction increases, as on hardware.
-  b.setSample(c,i,coloured*post);sum+=s.gr;
+  b.setSample(c,i,coloured*post*db(s.makeupDb));sum+=s.gr;
  }
  fetGR.store(sum/juce::jmax(1,n*b.getNumChannels()),std::memory_order_relaxed);
 }
