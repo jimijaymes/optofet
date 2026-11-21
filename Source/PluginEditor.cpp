@@ -9,9 +9,9 @@ OptoFETEditor::OptoFETEditor(OptoFETProcessor& p):AudioProcessorEditor(p),proces
   k.slider.setColour(juce::Slider::textBoxOutlineColourId,juce::Colours::transparentBlack);k.slider.setColour(juce::Slider::textBoxBackgroundColourId,juce::Colours::transparentBlack);
   addAndMakeVisible(k.slider);k.label.setText(names[i],juce::dontSendNotification);k.label.setJustificationType(juce::Justification::centred);k.label.setColour(juce::Label::textColourId,cream);addAndMakeVisible(k.label);
   k.attachment=std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(p.parameters,ids[i],k.slider);}
- const char* choiceIds[]={"optoRatio","response","release","fetRatio","oversampling"};
- const char* choiceNames[]={"OPTICAL MODE","T4 RESPONSE","OPTICAL RELEASE","1176 RATIO","OVERSAMPLING"};
- const char* options[][4]={{"COMPRESS","LIMIT",nullptr,nullptr},{"ENHANCED","CLASSIC T4",nullptr,nullptr},{"LA-2A SLOW","LA-3A FAST",nullptr,nullptr},{"4:1","8:1","12:1","20:1"},{"OFF (1X)","2X","4X","8X"}};
+ const char* choiceIds[]={"optoRatio","response","release","fetRatio","oversampling","fetTiming"};
+ const char* choiceNames[]={"OPTICAL MODE","T4 RESPONSE","OPTICAL RELEASE","1176 RATIO","OVERSAMPLING","FET TIMING"};
+ const char* options[][4]={{"COMPRESS","LIMIT",nullptr,nullptr},{"ENHANCED","CLASSIC T4",nullptr,nullptr},{"LA-2A SLOW","LA-3A FAST",nullptr,nullptr},{"4:1","8:1","12:1","20:1"},{"OFF (1X)","2X","4X","8X"},{"1176 CLASSIC","EXTENDED",nullptr,nullptr}};
  for(size_t i=0;i<choices.size();++i){auto& k=choices[i];for(int j=0;j<4;++j)if(options[i][j])k.combo.addItem(options[i][j],j+1);
   k.combo.setColour(juce::ComboBox::backgroundColourId,juce::Colour(0xff2b3540));k.combo.setColour(juce::ComboBox::textColourId,cream);k.combo.setColour(juce::ComboBox::outlineColourId,i==3?blue:gold);
   addAndMakeVisible(k.combo);k.label.setText(choiceNames[i],juce::dontSendNotification);k.label.setJustificationType(juce::Justification::centred);k.label.setColour(juce::Label::textColourId,cream);addAndMakeVisible(k.label);
@@ -38,9 +38,9 @@ void OptoFETEditor::paint(juce::Graphics& g){
 }
 void OptoFETEditor::resized(){
  const int positions[][2]={{38,174},{174,174},{38,294},{174,294},{580,174},{730,174},{880,174},{880,294}};
- for(int i=0;i<7;++i){auto& k=dials[(size_t)i];k.slider.setBounds(positions[i][0],positions[i][1],125,108);k.label.setBounds(positions[i][0]-10,positions[i][1]+106,145,25);}
- const int choicePos[][2]={{326,184},{326,252},{326,320},{622,368},{622,438}};
- for(int i=0;i<5;++i){auto& k=choices[(size_t)i];k.label.setBounds(choicePos[i][0],choicePos[i][1],175,22);k.combo.setBounds(choicePos[i][0]+5,choicePos[i][1]+24,165,28);}
- vintage.setBounds(332,416,205,34);reverse.setBounds(806,415,268,35);
+ for(int i=0;i<8;++i){auto& k=dials[(size_t)i];k.slider.setBounds(positions[i][0],positions[i][1],125,108);k.label.setBounds(positions[i][0]-10,positions[i][1]+106,145,25);}
+ const int choicePos[][2]={{326,184},{326,252},{326,320},{622,368},{622,438},{835,368}};
+ for(int i=0;i<6;++i){auto& k=choices[(size_t)i];k.label.setBounds(choicePos[i][0],choicePos[i][1],175,22);k.combo.setBounds(choicePos[i][0]+5,choicePos[i][1]+24,165,28);}
+ vintage.setBounds(332,416,205,34);reverse.setBounds(806,465,268,35);
 }
 void OptoFETEditor::timerCallback(){optical=.8f*optical+.2f*processor.opticalGR.load();fet=.8f*fet+.2f*processor.fetGR.load();repaint();}
