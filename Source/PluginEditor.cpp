@@ -7,14 +7,14 @@ OptoFETEditor::OptoFETEditor(OptoFETProcessor& p):AudioProcessorEditor(p),proces
   k.slider.setColour(juce::Slider::rotarySliderFillColourId,i==2||i==3?gold:(i>=4&&i<=6?blue:cream));k.slider.setColour(juce::Slider::rotarySliderOutlineColourId,juce::Colour(0xff3b4651));
   k.slider.setColour(juce::Slider::thumbColourId,cream);k.slider.setColour(juce::Slider::textBoxTextColourId,cream);
   k.slider.setColour(juce::Slider::textBoxOutlineColourId,juce::Colours::transparentBlack);k.slider.setColour(juce::Slider::textBoxBackgroundColourId,juce::Colours::transparentBlack);
-  addAndMakeVisible(k.slider);k.label.setText(names[i],juce::dontSendNotification);k.label.setJustificationType(juce::Justification::centred);k.label.setColour(juce::Label::textColourId,cream);addAndMakeVisible(k.label);
+  addAndMakeVisible(k.slider);k.label.setText(names[i],juce::dontSendNotification);k.label.setJustificationType(juce::Justification::centred);k.label.setMinimumHorizontalScale(0.68f);k.label.setColour(juce::Label::textColourId,cream);addAndMakeVisible(k.label);
   k.attachment=std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(p.parameters,ids[i],k.slider);}
  const char* choiceIds[]={"optoRatio","response","release","fetRatio","oversampling","fetTiming"};
  const char* choiceNames[]={"OPTICAL MODE","T4 RESPONSE","OPTICAL RELEASE","1176 RATIO","OVERSAMPLING","FET TIMING"};
  const char* options[][4]={{"COMPRESS","LIMIT",nullptr,nullptr},{"ENHANCED","CLASSIC T4",nullptr,nullptr},{"LA-2A SLOW","LA-3A FAST",nullptr,nullptr},{"4:1","8:1","12:1","20:1"},{"OFF (1X)","2X","4X","8X"},{"1176 CLASSIC","EXTENDED",nullptr,nullptr}};
  for(size_t i=0;i<choices.size();++i){auto& k=choices[i];for(int j=0;j<4;++j)if(options[i][j])k.combo.addItem(options[i][j],j+1);
   k.combo.setColour(juce::ComboBox::backgroundColourId,juce::Colour(0xff2b3540));k.combo.setColour(juce::ComboBox::textColourId,cream);k.combo.setColour(juce::ComboBox::outlineColourId,i==3?blue:gold);
-  addAndMakeVisible(k.combo);k.label.setText(choiceNames[i],juce::dontSendNotification);k.label.setJustificationType(juce::Justification::centred);k.label.setColour(juce::Label::textColourId,cream);addAndMakeVisible(k.label);
+  addAndMakeVisible(k.combo);k.label.setText(choiceNames[i],juce::dontSendNotification);k.label.setJustificationType(juce::Justification::centred);k.label.setMinimumHorizontalScale(0.68f);k.label.setColour(juce::Label::textColourId,cream);addAndMakeVisible(k.label);
   k.attachment=std::make_unique<juce::AudioProcessorValueTreeState::ComboBoxAttachment>(p.parameters,choiceIds[i],k.combo);}
  vintage.setButtonText("VINTAGE BANDWIDTH");reverse.setButtonText("1176 FIRST / REVERSE ORDER");
  optoEnabled.setButtonText("OPTICAL ON");fetEnabled.setButtonText("FET ON");
