@@ -4,6 +4,10 @@ class OptoFETEditor final:public juce::AudioProcessorEditor,private juce::Timer{
 public:
  explicit OptoFETEditor(OptoFETProcessor&);
  void paint(juce::Graphics&) override;
+    void paintPanel(juce::Graphics&);
+    struct ZoomPanel : juce::Component { std::function<void(juce::Graphics&)> draw; void paint(juce::Graphics& g) override { if(draw)draw(g); } } zoomPanel;
+    juce::ComboBox zoomChoice;
+    bool zoomReady=false;
  void resized() override;
 private:
  struct Dial{juce::Slider slider;juce::Label label;std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> attachment;};
