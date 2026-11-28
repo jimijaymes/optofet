@@ -43,10 +43,10 @@ void OptoFETEditor::paint(juce::Graphics& g){
 }
 void OptoFETEditor::resized(){
  const int positions[][2]={{46,614},{191,614},{38,174},{174,174},{580,174},{730,174},{880,174},{480,614},{625,614}};
- for(int i=0;i<9;++i){auto& k=dials[(size_t)i];k.slider.setBounds(positions[i][0],positions[i][1],125,108);k.label.setBounds(positions[i][0]-10,positions[i][1]+106,145,25);}
+ for(int i=0;i<9;++i){auto& k=dials[(size_t)i];k.slider.setBounds(positions[i][0],positions[i][1],125,108);k.label.setBounds(positions[i][0]-10,positions[i][1]+112,145,25);}
  const int choicePos[][2]={{326,184},{326,252},{326,320},{622,335},{622,405},{835,335}};
  for(int i=0;i<6;++i){auto& k=choices[(size_t)i];k.label.setBounds(choicePos[i][0],choicePos[i][1],175,22);k.combo.setBounds(choicePos[i][0]+5,choicePos[i][1]+24,165,28);}
- vintage.setBounds(332,416,205,34);reverse.setBounds(806,465,268,35);
+ vintage.setBounds(332,416,205,34);reverse.setBounds(806,450,268,32);
  optoEnabled.setBounds(42,464,180,30);fetEnabled.setBounds(576,464,150,30);
 }
 void OptoFETEditor::timerCallback(){optical=.8f*optical+.2f*processor.opticalGR.load();fet=.8f*fet+.2f*processor.fetGR.load();repaint();}
